@@ -2,7 +2,7 @@ interface Author {
 	nickname: string;
 }
 
-interface Article {
+interface AuthorData {
 	id: number;
 	title: string;
 	free: boolean;
@@ -11,14 +11,26 @@ interface Article {
 	summary: string;
 }
 
-interface ResponseArticles<T> {
+interface AuthorResponse<T> {
 	error: number;
 	data: T[];
 	total: number;
 }
 
+interface Article {
+	title: string;
+	link: string;
+	author: string;
+	pubDate: number;
+	summary: string;
+}
+
+interface Env {
+	SSPAI_USER_FEED: KVNamespace;
+}
+
 export default {
-	async fetch(request): Promise<Response> {
+	async fetch(request, env: Env): Promise<Response> {
 		try {
 			const url = new URL(request.url);
 			const author = url.pathname !== '/' ? url.pathname.slice(1) : '';
@@ -36,19 +48,27 @@ export default {
 				);
 			}
 
-			const articles = await getUserArticles(author);
+			let articles = await getUserArticles(author);
 			if (!articles || articles.length === 0) {
-				return new Response(
-					JSON.stringify({
-						error: `Can not get articles of author ${author}`,
-					}),
-					{
-						status: 502,
-						headers: {
-							'Content-Type': 'application/json',
-						},
-					}
-				);
+				const cached = await getArticlesFromKV(env, author);
+				if (cached && cached.length > 0) {
+					console.info(`Use cached articles for ${author}`);
+					articles = cached;
+				} else {
+					return new Response(
+						JSON.stringify({
+							error: `Can not get articles of author ${author}`,
+						}),
+						{
+							status: 502,
+							headers: {
+								'Content-Type': 'application/json',
+							},
+						}
+					);
+				}
+			} else {
+				await saveArticlesToKV(env, author, articles);
 			}
 			const jsonFeed = {
 				version: 'https://jsonfeed.org/version/1.1',
@@ -119,7 +139,7 @@ async function getUserArticles(slug: string) {
 	try {
 		const initialRequest = (await safeFetch(`https://sspai.com/api/v1/article/user/public/page/get?slug=${slug}&object_type=0`, undefined, {
 			retries: 0,
-		})) as ResponseArticles<Article> | undefined;
+		})) as AuthorResponse<AuthorData> | undefined;
 		if (!initialRequest || initialRequest.error !== -1) {
 			console.error('getUserArticles: unexpected response', initialRequest);
 			return [];
@@ -133,7 +153,7 @@ async function getUserArticles(slug: string) {
 			`https://sspai.com/api/v1/article/user/public/page/get?slug=${slug}&object_type=0&offset=0&limit=${total}`,
 			undefined,
 			{ retries: 2 }
-		)) as ResponseArticles<Article> | undefined;
+		)) as AuthorResponse<AuthorData> | undefined;
 		if (!realRequest || realRequest.error !== -1) {
 			console.error('getUserArticles: unexpected API response (real)', realRequest);
 			return [];
@@ -149,5 +169,30 @@ async function getUserArticles(slug: string) {
 	} catch (err) {
 		console.error('getUserArticles failed', err);
 		return [];
+	}
+}
+
+async function getArticlesFromKV(env: Env, author: string): Promise<Article[] | null> {
+	try {
+		const rawData = await env.SSPAI_USER_FEED.get(author);
+		if (!rawData) {
+			return null;
+		}
+		const articles = JSON.parse(rawData);
+		if (!Array.isArray(articles)) {
+			return null;
+		}
+		return articles;
+	} catch (err) {
+		console.error('getArticlesFromKV error:', err);
+		return null;
+	}
+}
+
+async function saveArticlesToKV(env: Env, author: string, articles: Article[]) {
+	try {
+		await env.SSPAI_USER_FEED.put(author, JSON.stringify(articles));
+	} catch (err) {
+		console.error('saveArticlesToKV error:', err);
 	}
 }
