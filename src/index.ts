@@ -142,7 +142,7 @@ async function getUserArticles(slug: string) {
 			title: free ? title : `[$] ${title}`,
 			link: `https://sspai.com/post/${id}`,
 			author: nickname,
-			pubDate: released_time * 999,
+			pubDate: released_time * 1000,
 			summary,
 		}));
 		return articles;
