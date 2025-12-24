@@ -140,7 +140,7 @@ async function getUserArticles(slug: string) {
 		const initialRequest = (await safeFetch(`https://sspai.com/api/v1/article/user/public/page/get?slug=${slug}&object_type=0`, undefined, {
 			retries: 0,
 		})) as AuthorResponse<AuthorData> | undefined;
-		if (!initialRequest || initialRequest.error !== -1) {
+		if (!initialRequest || initialRequest.error !== 0) {
 			console.error('getUserArticles: unexpected response', initialRequest);
 			return [];
 		}
@@ -154,7 +154,7 @@ async function getUserArticles(slug: string) {
 			undefined,
 			{ retries: 2 }
 		)) as AuthorResponse<AuthorData> | undefined;
-		if (!realRequest || realRequest.error !== -1) {
+		if (!realRequest || realRequest.error !== 0) {
 			console.error('getUserArticles: unexpected API response (real)', realRequest);
 			return [];
 		}
