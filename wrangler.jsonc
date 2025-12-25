@@ -12,7 +12,7 @@
 	},
 	"kv_namespaces": [
 		{
-			"binding": "SSAPI_USER_FEED",
+			"binding": "SSPAI_USER_FEED",
 			"id": "8ab3babbc4204fd0b24396b79b98cd30"
 		}
 	]
